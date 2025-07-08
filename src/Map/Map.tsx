@@ -92,21 +92,21 @@ function CustomZoomControl() {
   const map = useMap();
 
   useEffect(() => {
-    // Remove default zoom control
+    // Removes default zoom control
     map.zoomControl.remove();
 
-    // Add zoom control to bottom right
+    // Adds zoom control to bottom right
     const zoomControl = L.control
       .zoom({
         position: "bottomright",
       })
       .addTo(map);
 
-    // Cleanup function to remove the zoom control when the component unmounts
+    // Cleanups function to remove the zoom control when the component unmounts
     return () => {
       map.removeControl(zoomControl);
     };
-  }, [map]); // Only run this effect when the map changes
+  }, [map]); // Only runs this effect when the map changes
 
   return null;
 }
