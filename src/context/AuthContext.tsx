@@ -1,5 +1,5 @@
 "use client";
-import {
+import React, {
   createContext,
   useContext,
   useEffect,
@@ -7,24 +7,15 @@ import {
   ReactNode,
 } from "react";
 import { useRouter } from "next/navigation";
-
-interface User {
-  id: number;
-  name: string;
-  email: string;
-  role: "ADMIN" | "HOST" | "GUEST";
-  profileImage?: string;
-  isVerified: boolean;
-}
+import { api, User, LoginCredentials, RegisterData } from "@/lib/api";
 
 interface AuthContextType {
   user: User | null;
-  loading: boolean;
-  login: (email: string, password: string) => Promise<void>;
-  register: (userData: RegisterData) => Promise<void>;
-  logout: () => Promise<void>;
-  checkAuth: () => Promise<void>;
+  isLoading: boolean;
   error: string | null;
+  login: (credentials: LoginCredentials) => Promise<void>;
+  register: (data: RegisterData) => Promise<void>;
+  logout: () => Promise<void>;
   clearError: () => void;
 }
 
@@ -32,136 +23,124 @@ interface AuthProviderProps {
   children: ReactNode;
 }
 
-interface RegisterData {
-  name: string;
-  email: string;
-  password: string;
-  role?: "HOST" | "GUEST";
-  phone?: string;
-}
-
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export const AuthProvider = ({ children }: AuthProviderProps) => {
+// Helper functions for token management
+const saveToken = (token: string) => {
+  localStorage.setItem("auth_token", token);
+};
+
+const getToken = (): string | null => {
+  if (typeof window !== "undefined") {
+    return localStorage.getItem("auth_token");
+  }
+  return null;
+};
+
+const removeToken = () => {
+  localStorage.removeItem("auth_token");
+};
+
+export function AuthProvider({ children }: AuthProviderProps) {
   const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
 
+  // Check if user is authenticated when the app loads
   useEffect(() => {
-    checkAuth();
+    const checkAuthStatus = async () => {
+      try {
+        const token = getToken();
+        if (!token) {
+          setUser(null);
+          setIsLoading(false);
+          return;
+        }
+
+        const currentUser = await api.getCurrentUser(token);
+        setUser(currentUser);
+      } catch (error) {
+        // User is not authenticated or token is invalid
+        console.error("Authentication error:", error);
+        removeToken();
+        setUser(null);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    checkAuthStatus();
   }, []);
 
-  const checkAuth = async () => {
+  const login = async (credentials: LoginCredentials) => {
     try {
-      setLoading(true);
-      const res = await fetch("http://localhost:8000/api/auth/me", {
-        credentials: "include",
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        setUser(data.user);
-      } else {
-        setUser(null);
-      }
-    } catch (err) {
-      console.error("Auth check error:", err);
-      setUser(null);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const login = async (email: string, password: string) => {
-    try {
-      setLoading(true);
+      setIsLoading(true);
       setError(null);
+      const { user, token } = await api.login(credentials);
 
-      const res = await fetch("http://localhost:8000/api/auth/login", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        credentials: "include",
-        body: JSON.stringify({ email, password }),
-      });
-
-      if (!res.ok) {
-        const error = await res.json();
-        throw new Error(error.message || "Login failed");
-      }
-
-      const data = await res.json();
-      setUser(data.user);
+      // Save token and user data
+      saveToken(token);
+      setUser(user);
 
       // Redirect based on user role
-      if (data.user.role === "ADMIN") {
+      if (user.role === "ADMIN") {
         router.push("/admin/dashboard");
-      } else if (data.user.role === "HOST") {
+      } else if (user.role === "HOST") {
         router.push("/host/dashboard");
       } else {
         router.push("/");
       }
     } catch (err) {
-      console.error("Login error:", err);
-      setError(err instanceof Error ? err.message : "Login failed");
-      throw err;
+      if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError("An unknown error occurred during login");
+      }
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
-  const register = async (userData: RegisterData) => {
+  const register = async (data: RegisterData) => {
     try {
-      setLoading(true);
+      setIsLoading(true);
       setError(null);
+      const { user, token } = await api.register(data);
 
-      const res = await fetch("http://localhost:8000/api/auth/register", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        credentials: "include",
-        body: JSON.stringify(userData),
-      });
+      // Save token and user data
+      saveToken(token);
+      setUser(user);
 
-      if (!res.ok) {
-        const error = await res.json();
-        throw new Error(error.message || "Registration failed");
-      }
-
-      const data = await res.json();
-      setUser(data.user);
-
-      // Redirect based on user role
-      if (data.user.role === "HOST") {
-        router.push("/host/dashboard");
-      } else {
-        router.push("/");
-      }
+      // Redirect to login after successful registration
+      router.push("/login");
     } catch (err) {
-      console.error("Registration error:", err);
-      setError(err instanceof Error ? err.message : "Registration failed");
-      throw err;
+      if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError("An unknown error occurred during registration");
+      }
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
   const logout = async () => {
     try {
-      setLoading(true);
-      await fetch("http://localhost:8000/api/auth/logout", {
-        method: "GET",
-        credentials: "include",
-      });
+      setIsLoading(true);
+      // No need to call API for logout with token-based auth
+      // Just remove the token from local storage
+      removeToken();
       setUser(null);
       router.push("/");
     } catch (err) {
-      console.error("Logout error:", err);
+      if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError("An unknown error occurred during logout");
+      }
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
@@ -173,24 +152,23 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     <AuthContext.Provider
       value={{
         user,
-        loading,
+        isLoading,
+        error,
         login,
         register,
         logout,
-        checkAuth,
-        error,
         clearError,
       }}
     >
       {children}
     </AuthContext.Provider>
   );
-};
+}
 
-export const useAuth = () => {
+export function useAuth() {
   const context = useContext(AuthContext);
   if (context === undefined) {
     throw new Error("useAuth must be used within an AuthProvider");
   }
   return context;
-};
+}

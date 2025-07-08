@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -21,16 +22,28 @@ import { AlertCircle, Loader2 } from "lucide-react";
 
 const loginSchema = z.object({
   email: z.string().email({ message: "Please enter a valid email address" }),
-  password: z.string().min(8, {
-    message: "Password must be at least 8 characters",
-  }),
+  password: z.string().min(1, { message: "Password is required" }),
 });
 
 type LoginFormValues = z.infer<typeof loginSchema>;
 
 export default function LoginPage() {
-  const { login, error, clearError } = useAuth();
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const { login, user, error, clearError, isLoading } = useAuth();
+  const [submitting, setSubmitting] = useState(false);
+  const router = useRouter();
+
+  // Redirect if already logged in
+  useEffect(() => {
+    if (user) {
+      if (user.role === "ADMIN") {
+        router.push("/admin/dashboard");
+      } else if (user.role === "HOST") {
+        router.push("/host/dashboard");
+      } else {
+        router.push("/guest/dashboard");
+      }
+    }
+  }, [user, router]);
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
@@ -42,12 +55,12 @@ export default function LoginPage() {
 
   const onSubmit = async (data: LoginFormValues) => {
     try {
-      setIsSubmitting(true);
-      await login(data.email, data.password);
+      setSubmitting(true);
+      await login(data);
     } catch (error) {
       console.error("Login error:", error);
     } finally {
-      setIsSubmitting(false);
+      setSubmitting(false);
     }
   };
 
@@ -59,19 +72,19 @@ export default function LoginPage() {
             Sign in to your account
           </h1>
           <p className="mt-2 text-center text-sm text-gray-600">
-            Or{" "}
+            Don&apos;t have an account?{" "}
             <Link
               href="/register"
-              className="font-medium text-blue-600 hover:text-blue-500"
+              className="font-medium text-primary hover:text-primary/80"
             >
-              create a new account
+              Create one
             </Link>
           </p>
         </div>
 
         {error && (
           <Alert variant="destructive" className="mt-4">
-            <AlertCircle className="h-4 w-4" />
+            <AlertCircle className="h-4 w-4 mr-2" />
             <AlertDescription>{error}</AlertDescription>
           </Alert>
         )}
@@ -82,7 +95,7 @@ export default function LoginPage() {
             className="mt-8 space-y-6"
             onChange={clearError}
           >
-            <div className="space-y-4 rounded-md shadow-sm">
+            <div className="space-y-4">
               <FormField
                 control={form.control}
                 name="email"
@@ -126,7 +139,7 @@ export default function LoginPage() {
               <div className="text-sm">
                 <Link
                   href="/forgot-password"
-                  className="font-medium text-blue-600 hover:text-blue-500"
+                  className="font-medium text-primary hover:text-primary/80"
                 >
                   Forgot your password?
                 </Link>
@@ -134,8 +147,12 @@ export default function LoginPage() {
             </div>
 
             <div>
-              <Button type="submit" className="w-full" disabled={isSubmitting}>
-                {isSubmitting ? (
+              <Button
+                type="submit"
+                className="w-full"
+                disabled={submitting || isLoading}
+              >
+                {submitting || isLoading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     Signing in...
@@ -147,6 +164,28 @@ export default function LoginPage() {
             </div>
           </form>
         </Form>
+
+        <div className="mt-6">
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-gray-300" />
+            </div>
+            <div className="relative flex justify-center text-sm">
+              <span className="px-2 bg-gray-50 text-gray-500">
+                Or continue with
+              </span>
+            </div>
+          </div>
+
+          <div className="mt-6 grid grid-cols-2 gap-3">
+            <Button variant="outline" className="w-full" type="button">
+              Google
+            </Button>
+            <Button variant="outline" className="w-full" type="button">
+              Facebook
+            </Button>
+          </div>
+        </div>
       </div>
     </div>
   );

@@ -104,7 +104,7 @@ export default function RegisterPage() {
       }
 
       // Remove confirmPassword before sending to API
-      const { confirmPassword, ...registerData } = data;
+      const { ...registerData } = data;
       await register(registerData);
     } catch (error) {
       console.error("Registration error:", error);

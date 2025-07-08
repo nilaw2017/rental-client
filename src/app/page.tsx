@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
+import { MapPin } from "lucide-react";
 
 export default function Home() {
   const { user, logout } = useAuth();
@@ -17,7 +18,7 @@ export default function Home() {
           Find your perfect home, apartment, or vacation rental
         </p>
 
-        <div className="flex flex-col sm:flex-row gap-4 justify-center">
+        <div className="flex flex-col sm:flex-row gap-4 justify-center mb-8">
           {user ? (
             <>
               <div className="bg-white p-6 rounded-lg shadow-md">
@@ -43,7 +44,18 @@ export default function Home() {
                     <Link href="/properties">Browse Properties</Link>
                   </Button>
 
-                  <Button variant="outline" onClick={logout}>
+                  <Button asChild>
+                    <Link href="/map" className="flex items-center gap-2">
+                      <MapPin className="h-4 w-4" />
+                      View Map
+                    </Link>
+                  </Button>
+
+                  <Button
+                    variant="outline"
+                    onClick={logout}
+                    className="text-white"
+                  >
                     Sign Out
                   </Button>
                 </div>
@@ -51,11 +63,21 @@ export default function Home() {
             </>
           ) : (
             <>
-              <Button asChild size="lg" className="px-8">
-                <Link href="/login">Sign In</Link>
+              <Button asChild size="lg" className="px-8 text-white">
+                <Link href="/login" className="text-white">
+                  Sign In
+                </Link>
               </Button>
               <Button asChild size="lg" variant="outline" className="px-8">
-                <Link href="/register">Create Account</Link>
+                <Link href="/register" className="text-white">
+                  Create Account
+                </Link>
+              </Button>
+              <Button asChild size="lg" variant="secondary" className="px-8">
+                <Link href="/map" className="flex items-center gap-2">
+                  <MapPin className="h-4 w-4" />
+                  Explore Map
+                </Link>
               </Button>
             </>
           )}
